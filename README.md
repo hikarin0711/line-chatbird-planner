@@ -38,7 +38,7 @@ sequenceDiagram
   User->>LINE: 予定 or 雑談チャット
   LINE->>Webhook(Lambda): Webhookイベント
   Webhook(Lambda)->>Webhook(Lambda): 署名検証
-  Webhook(Lambda)->>Webhook(Lambda): メッセージ解析 / キーワード抽出
+  Webhook(Lambda)->>Webhook(Lambda): メッセージ解析 / キーワード抽出 / 意図判定
 
   alt メッセージに「予定」が含まれる
     Webhook(Lambda)->>DynamoDB: 該当ユーザーの予定一覧を取得
@@ -50,13 +50,21 @@ sequenceDiagram
     Webhook(Lambda)->>LINE: 削除結果を通知
     LINE->>User: 削除結果を出力
   else その他のメッセージ
-    Webhook(Lambda)->>ChatGPT: JSON形式で返すようにリクエスト
-    ChatGPT-->>Webhook(Lambda): JSON or 応答メッセージ
-    alt JSONとして解釈可能
+    Webhook(Lambda)->>Webhook(Lambda): スケジュール登録関連か判定
+
+    alt スケジュール登録関連
+      Webhook(Lambda)->>ChatGPT: JSON形式で返すようにリクエスト
+      ChatGPT-->>Webhook(Lambda): スケジュール情報(JSON)
       Webhook(Lambda)->>DynamoDB: 新しい予定を保存
+      Webhook(Lambda)->>LINE: スケジュール登録完了メッセージを送信
+      LINE->>User: スケジュール登録完了を通知
+
+    else 雑談（文鳥Bot応答）
+      Webhook(Lambda)->>ChatGPT: 自然文で応答するようにリクエスト
+      ChatGPT-->>Webhook(Lambda): 応答メッセージ
+      Webhook(Lambda)->>LINE: 応答メッセージを送信
+      LINE->>User: 雑談応答を表示
     end
-    Webhook(Lambda)->>LINE: ChatGPTの応答を送信
-    LINE->>User: 応答出力
   end
 
   Note over Notifier(Lambda): 2分ごとにEventBridgeから起動
