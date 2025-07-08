@@ -38,26 +38,31 @@ sequenceDiagram
   User->>LINE: 予定 or 雑談チャット
   LINE->>Webhook(Lambda): Webhookイベント
   Webhook(Lambda)->>Webhook(Lambda): 署名検証
+  Webhook(Lambda)->>Webhook(Lambda): メッセージ解析 / キーワード抽出
 
   alt メッセージに「予定」が含まれる
     Webhook(Lambda)->>DynamoDB: 該当ユーザーの予定一覧を取得
     DynamoDB-->>Webhook(Lambda): ソート済みの予定リスト
     Webhook(Lambda)->>LINE: 予定一覧を返信
+    LINE->>User: 予定一覧を出力
   else メッセージに「削除」が含まれる
     Webhook(Lambda)->>DynamoDB: 指定された予定を削除
     Webhook(Lambda)->>LINE: 削除結果を通知
+    LINE->>User: 削除結果を出力
   else その他のメッセージ
     Webhook(Lambda)->>ChatGPT: JSON形式で返すようにリクエスト
     ChatGPT-->>Webhook(Lambda): JSON or 応答メッセージ
-    alt JSON形式なら
+    alt JSONとして解釈可能
       Webhook(Lambda)->>DynamoDB: 新しい予定を保存
     end
     Webhook(Lambda)->>LINE: ChatGPTの応答を送信
+    LINE->>User: 応答出力
   end
 
   Note over Notifier(Lambda): 2分ごとにEventBridgeから起動
-  Notifier(Lambda)->>DynamoDB: 通知すべき予定を検索
+  Notifier(Lambda)->>DynamoDB: 通知すべき予定を（DB保存の通知時刻に基づき）検索
   Notifier(Lambda)->>LINE: Push通知を送信
+  LINE->>User: 通知を表示
 ```
 
 ---
